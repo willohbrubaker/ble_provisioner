@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ble Provisioner</string>
+	<string>XH-C2X Provisioner</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app uses Bluetooth to scan for and connect to XH-C2X devices during provisioning.</string>
+	
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app communicates with nearby Bluetooth hardware for device setup.</string>
+	
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Bluetooth scanning requires location access on iOS to discover nearby devices securely.</string>
 </dict>
 </plist>

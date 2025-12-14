@@ -10,6 +10,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'XH-C2X Provisioner',
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData.dark(),
       home: const BleProvisioner(),
     );
   }
@@ -156,7 +158,9 @@ class _BleProvisionerState extends State<BleProvisioner> {
           children: [
             ElevatedButton(
               onPressed: isScanning ? null : _startScan,
-              child: Text(isScanning ? 'Scanning...' : 'Scan for Devices'),
+              child: Text(isScanning ? 'Scanning...' : 'Scan for Devices',
+              style: const TextStyle(color: Colors.white),
+              ),
             ),
             const SizedBox(height: 20),
             if (scanResults.isNotEmpty) ...[
