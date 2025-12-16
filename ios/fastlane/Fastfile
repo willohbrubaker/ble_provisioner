@@ -20,7 +20,7 @@ platform :ios do
       export_method: "app-store",
       output_directory: "../build/ios/ipa",
       output_name: "XH-C2X-Provisioner.ipa",
-      xcodebuild_args: "-allowProvisioningUpdates"
+      xcargs: "-allowProvisioningUpdates"
     )
   end
 end
