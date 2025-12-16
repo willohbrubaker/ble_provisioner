@@ -16,11 +16,11 @@ platform :ios do
     )
 
     build_app(
+      workspace: "Runner.xcworkspace",
       scheme: "Runner",
       export_method: "app-store",
       output_directory: "../build/ios/ipa",
-      output_name: "XH-C2X-Provisioner.ipa",
-      api_key: api_key
+      output_name: "XH-C2X-Provisioner.ipa"
     )
   end
 end
