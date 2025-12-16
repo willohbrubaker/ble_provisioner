@@ -30,8 +30,15 @@ jobs:
       - name: Build iOS (unsigned)
         run: flutter build ios --release --no-codesign
 
-      - name: Upload build artifacts (optional)
+      - name: Zip and upload Runner.app as artifact
+        run: |
+          cd build/ios/iphoneos
+          zip -r Runner.ipa Runner.app  # Creates a zip you can download (pseudo-IPA)
+          cd ../../..
+      
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build-archive
-          path: build/ios/archive/
+          name: ios-runner-app
+          path: build/ios/iphoneos/Runner.ipa
+          
