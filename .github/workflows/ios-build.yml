@@ -22,10 +22,10 @@ jobs:
         run: flutter pub get
 
       - name: Clean iOS (extra safety)
-          run: |
-            cd ios
-            rm -rf Pods Podfile.lock .symlinks
-            pod install  # Installs fresh pods
+        run: |
+          cd ios
+          rm -rf Pods Podfile.lock .symlinks
+          pod install  # Installs fresh pods
 
       - name: Build iOS (unsigned)
         run: flutter build ios --release --no-codesign
@@ -34,11 +34,10 @@ jobs:
         run: |
           cd build/ios/iphoneos
           zip -r Runner.ipa Runner.app  # Creates a zip you can download (pseudo-IPA)
-          cd ../../..
+          cd ../../../
       
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-runner-app
           path: build/ios/iphoneos/Runner.ipa
-          
