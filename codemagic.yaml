@@ -1,8 +1,8 @@
 workflows:
   ios-build:
     name: iOS Signed Build
-    max_build_duration: 40
-    instance_type: mac_mini_m1
+    max_build_duration: 120  # Increased for first build safety (caching/pods)
+    instance_type: mac_mini_m1  # Fast Apple silicon runner
     environment:
       flutter: stable
       xcode: latest
@@ -24,17 +24,9 @@ workflows:
           rm -rf Pods Podfile.lock .symlinks
           pod install
 
-      - name: Verify Fastlane files
-        script: ls -la ios/fastlane
-
-      - name: Install Fastlane
-        script: gem install fastlane -NV
-
-      - name: Run Fastlane signed build lane
-        script: |
-          cd ios
-          fastlane build_signed_ipa
+      - name: Build signed IPA with Flutter
+        script: flutter build ipa --release  # Codemagic automatic signing handles certs/profiles
 
     artifacts:
-      - build/ios/ipa/*.ipa
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/Products/**-iphoneos/*.app
+      - build/ios/ipa/*.ipa  # Uploads your signed XH-C2X-Provisioner.ipa (Flutter names it automatically)
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/Products/**-iphoneos/*.app  # Debug app bundle if needed
