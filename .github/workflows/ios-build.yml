@@ -27,17 +27,23 @@ jobs:
           rm -rf Pods Podfile.lock .symlinks
           pod install  # Installs fresh pods
 
-      - name: Build iOS (unsigned)
-        run: flutter build ios --release --no-codesign
+      - name: Verify Fastlane files
+        run: ls -la ios/fastlane
 
-      - name: Zip and upload Runner.app as artifact
+      - name: Install Fastlane
+        run: gem install fastlane -NV
+
+      - name: Build signed IPA
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: |
-          cd build/ios/iphoneos
-          zip -r Runner.ipa Runner.app  # Creates a zip you can download (pseudo-IPA)
-          cd ../../../
-      
-      - name: Upload build artifact
+          cd ios
+          fastlane build_signed_ipa  # Runs the lane we added
+
+      - name: Upload signed IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-runner-app
-          path: build/ios/iphoneos/Runner.ipa
+          name: ios-signed-ipa
+          path: build/ios/ipa/XH-C2X-Provisioner.ipa
