@@ -2,7 +2,6 @@ default_platform(:ios)
 
 platform :ios do
   lane :build_signed_ipa do
-    # Load API key for authentication
     api_key = app_store_connect_api_key(
       key_id: ENV["ASC_KEY_ID"],
       issuer_id: ENV["ASC_ISSUER_ID"],

@@ -8,7 +8,7 @@
 PRODUCT_NAME = ble_provisioner
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.bleProvisioner
+PRODUCT_BUNDLE_IDENTIFIER = com.brubaker.bleProvisioner
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 com.example. All rights reserved.
