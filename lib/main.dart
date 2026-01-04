@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 
 void main() => runApp(const MyApp());
 
@@ -11,7 +12,15 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'XH-C2X Provisioner',
       themeMode: ThemeMode.dark,
-      darkTheme: ThemeData.dark(),
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: Colors.blueAccent,
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            textStyle: const TextStyle(fontSize: 18),
+          ),
+        ),
+      ),
       home: const BleProvisioner(),
     );
   }
@@ -32,8 +41,12 @@ class _BleProvisionerState extends State<BleProvisioner> {
   BluetoothCharacteristic? portChar;
   final TextEditingController ssidController = TextEditingController();
   final TextEditingController passController = TextEditingController();
-  final TextEditingController ipController = TextEditingController(text: '108.254.1.184');
-  final TextEditingController portController = TextEditingController(text: '9019');
+  final TextEditingController ipController = TextEditingController(
+    text: '108.254.1.184',
+  );
+  final TextEditingController portController = TextEditingController(
+    text: '9019',
+  );
   bool isScanning = false;
   bool isConnected = false;
   bool isProvisioning = false;
@@ -56,12 +69,23 @@ class _BleProvisionerState extends State<BleProvisioner> {
       isScanning = true;
       scanResults.clear();
     });
+
+    // Prime scan for iOS reliability
+    if (Platform.isIOS) {
+      FlutterBluePlus.startScan(timeout: const Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 1));
+      FlutterBluePlus.stopScan();
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
+
     scanSubscription = FlutterBluePlus.scanResults.listen((results) {
       setState(() {
         scanResults = results.where((r) => r.device.name == 'XH-C2X').toList();
       });
     });
+
     await Future.delayed(const Duration(seconds: 15));
     FlutterBluePlus.stopScan();
     setState(() => isScanning = false);
@@ -69,8 +93,12 @@ class _BleProvisionerState extends State<BleProvisioner> {
 
   void _connectToDevice(BluetoothDevice device) async {
     try {
-      await device.connect(timeout: const Duration(seconds: 10));
+      await device.connect(
+        timeout: const Duration(seconds: 10),
+        license: License.free,
+      );
       setState(() => isConnected = true);
+      selectedDevice = device;
       final services = await device.discoverServices();
       for (final service in services) {
         if (service.uuid == serviceUuid) {
@@ -82,19 +110,19 @@ class _BleProvisionerState extends State<BleProvisioner> {
           }
         }
       }
-      if (ssidChar != null && passChar != null && ipChar != null && portChar != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connected! Ready to provision.')),
-        );
+      if (ssidChar != null &&
+          passChar != null &&
+          ipChar != null &&
+          portChar != null) {
+        _showSnackBar('Connected successfully! Ready to provision.');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Characteristics missing.')),
+        _showSnackBar(
+          'Connected, but some characteristics missing.',
+          isError: true,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Connection failed: $e')),
-      );
+      _showSnackBar('Connection failed: $e', isError: true);
     }
   }
 
@@ -105,105 +133,231 @@ class _BleProvisionerState extends State<BleProvisioner> {
         isConnected = false;
         selectedDevice = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Disconnected.')),
-      );
+      _showSnackBar('Disconnected.');
     }
   }
 
   void _provisionWiFi() async {
-    if (!isConnected || ssidController.text.isEmpty || passController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fill SSID and password.')),
-      );
+    if (ssidController.text.isEmpty || passController.text.isEmpty) {
+      _showSnackBar('Please enter SSID and password.', isError: true);
       return;
     }
     setState(() => isProvisioning = true);
     try {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending SSID...')));
-      await ssidChar!.write(ssidController.text.codeUnits, withoutResponse: true);
+      await ssidChar!.write(
+        ssidController.text.codeUnits,
+        withoutResponse: true,
+      );
       await Future.delayed(const Duration(seconds: 1));
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending Password...')));
-      await passChar!.write(passController.text.codeUnits, withoutResponse: true);
+      await passChar!.write(
+        passController.text.codeUnits,
+        withoutResponse: true,
+      );
       await Future.delayed(const Duration(seconds: 1));
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending Server IP...')));
       await ipChar!.write(ipController.text.codeUnits, withoutResponse: true);
       await Future.delayed(const Duration(seconds: 1));
-
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending Server Port...')));
-      await portChar!.write(portController.text.codeUnits, withoutResponse: true);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Provisioning complete! Device will connect and download code.')),
+      await portChar!.write(
+        portController.text.codeUnits,
+        withoutResponse: true,
       );
-      Timer(const Duration(seconds: 5), _disconnectFromDevice);
+
+      _showSnackBar('Provisioning complete! Device will reboot and connect.');
+      Timer(const Duration(seconds: 5), () {
+        _disconnectFromDevice();
+        ssidController.clear();
+        passController.clear();
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnackBar('Provisioning error: $e', isError: true);
     } finally {
       setState(() => isProvisioning = false);
     }
   }
 
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : null,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('XH-C2X Provisioner')),
+      appBar: AppBar(
+        title: const Text('XH-C2X Provisioner'),
+        centerTitle: true,
+        backgroundColor: Colors.blueAccent,
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            ElevatedButton(
-              onPressed: isScanning ? null : _startScan,
-              child: Text(isScanning ? 'Scanning...' : 'Scan for Devices',
-              style: const TextStyle(color: Colors.white),
+            // Scan Button - Prominent
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isScanning
+                    ? null
+                    : () async {
+                        if (Platform.isIOS) {
+                          await FlutterBluePlus.turnOff();
+                          await Future.delayed(
+                            const Duration(milliseconds: 500),
+                          );
+                          await FlutterBluePlus.turnOn();
+                          await Future.delayed(const Duration(seconds: 1));
+                        }
+                        _startScan();
+                      },
+                icon: isScanning
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(
+                  isScanning
+                      ? 'Scanning for devices...'
+                      : 'Scan for XH-C2X Devices',
+                ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 30),
+
+            // Device List
             if (scanResults.isNotEmpty) ...[
-              const Text('Devices (Tap to Connect):'),
+              const Text(
+                'Found Devices',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
               Expanded(
                 child: ListView.builder(
                   itemCount: scanResults.length,
                   itemBuilder: (context, index) {
                     final result = scanResults[index];
+                    final isThisConnected =
+                        isConnected &&
+                        selectedDevice?.remoteId == result.device.remoteId;
                     return Card(
+                      elevation: 4,
+                      margin: const EdgeInsets.symmetric(vertical: 6),
                       child: ListTile(
+                        leading: Icon(
+                          isThisConnected
+                              ? Icons.bluetooth_connected
+                              : Icons.bluetooth_searching,
+                          color: isThisConnected ? Colors.green : Colors.blue,
+                        ),
                         title: Text(result.device.name ?? 'XH-C2X'),
-                        subtitle: Text('MAC: ${result.device.remoteId.str}'),
+                        subtitle: Text(
+                          'ID: ${result.device.remoteId.str}\nRSSI: ${result.rssi} dBm',
+                        ),
                         trailing: ElevatedButton(
-                          onPressed: () {
-                            setState(() => selectedDevice = result.device);
-                            _connectToDevice(result.device);
-                          },
-                          child: Text(isConnected && selectedDevice?.remoteId == result.device.remoteId ? 'Connected' : 'Connect'),
+                          onPressed: isThisConnected
+                              ? null
+                              : () => _connectToDevice(result.device),
+                          child: Text(
+                            isThisConnected ? 'Connected' : 'Connect',
+                          ),
                         ),
                       ),
                     );
                   },
                 ),
               ),
-            ],
-            if (isConnected) ...[
-              const SizedBox(height: 20),
-              Text('Provision (Connected to ${selectedDevice!.name ?? 'XH-C2X'}):'),
-              TextField(controller: ssidController, decoration: const InputDecoration(labelText: 'WiFi SSID')),
-              TextField(controller: passController, decoration: const InputDecoration(labelText: 'WiFi Password'), obscureText: true),
-              TextField(controller: ipController, decoration: const InputDecoration(labelText: 'Server IP (default 108.254.1.184)')),
-              TextField(controller: portController, decoration: const InputDecoration(labelText: 'Server Port (default 9019)')),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: isProvisioning ? null : _provisionWiFi,
-                child: Text(isProvisioning ? 'Provisioning...' : 'Provision WiFi & Server'),
+            ] else if (!isScanning && scanResults.isEmpty && !isConnected) ...[
+              const Icon(
+                Icons.bluetooth_disabled,
+                size: 80,
+                color: Colors.grey,
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _disconnectFromDevice,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Disconnect'),
+              const SizedBox(height: 20),
+              const Text(
+                'No devices found.\nPress Scan to search.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            ],
+
+            // Provisioning Form (only when connected)
+            if (isConnected) ...[
+              const Divider(height: 40, thickness: 2),
+              const Text(
+                'WiFi & Server Setup',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: ssidController,
+                decoration: const InputDecoration(
+                  labelText: 'WiFi SSID',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'WiFi Password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ipController,
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Server IP',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: portController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Server Port',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: isProvisioning ? null : _provisionWiFi,
+                  icon: isProvisioning
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Icon(Icons.send),
+                  label: Text(
+                    isProvisioning ? 'Provisioning...' : 'Send Configuration',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _disconnectFromDevice,
+                  icon: const Icon(Icons.bluetooth_disabled),
+                  label: const Text('Disconnect'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                ),
               ),
             ],
           ],
