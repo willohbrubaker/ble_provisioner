@@ -53,5 +53,7 @@
 	
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Bluetooth scanning requires location access on iOS to discover nearby devices securely.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
